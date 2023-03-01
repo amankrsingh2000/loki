@@ -2,10 +2,15 @@ package ibmcloud
 
 import (
 	"context"
+	//"crypto/tls"
+	//"crypto/x509"
 	"flag"
+	//"fmt"
+	"hash/fnv"
 	"io"
 	"net"
 	"net/http"
+	//"os"
 	"strings"
 	"time"
 
@@ -210,9 +215,51 @@ func (a *COSObjectClient) DeleteObject(ctx context.Context, objectKey string) er
 	return nil
 }
 
-// GetObject returns a reader and the size for the specified object key from the configured S3 bucket.
+// bucketFromKey maps a key to a bucket name
+func (a *COSObjectClient) bucketFromKey(key string) string {
+	if len(a.bucketNames) == 0 {
+		return ""
+	}
+
+	hasher := fnv.New32a()
+	hasher.Write([]byte(key)) //nolint: errcheck
+	hash := hasher.Sum32()
+
+	return a.bucketNames[hash%uint32(len(a.bucketNames))]
+}
+
+// GetObject returns a reader and the size for the specified object key from the configured COS bucket.
 func (a *COSObjectClient) GetObject(ctx context.Context, objectKey string) (io.ReadCloser, int64, error) {
-	return nil, 0, nil
+
+	var resp *s3.GetObjectOutput
+
+	// Map the key into a bucket
+	bucket := a.bucketFromKey(objectKey)
+
+	retries := backoff.New(ctx, a.cfg.BackoffConfig)
+	err := ctx.Err()
+	for retries.Ongoing() {
+		if ctx.Err() != nil {
+			return nil, 0, errors.Wrap(ctx.Err(), "ctx related error during s3 getObject")
+		}
+		err = instrument.CollectedRequest(ctx, "S3.GetObject", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
+			var requestErr error
+			resp, requestErr = a.hedgedS3.GetObjectWithContext(ctx, &s3.GetObjectInput{
+				Bucket: cos.String(bucket),
+				Key:    cos.String(objectKey),
+			})
+			return requestErr
+		})
+		var size int64
+		if resp.ContentLength != nil {
+			size = *resp.ContentLength
+		}
+		if err == nil && resp.Body != nil {
+			return resp.Body, size, nil
+		}
+		retries.Wait()
+	}
+	return nil, 0, errors.Wrap(err, "failed to get cos object")
 }
 
 // PutObject into the store
