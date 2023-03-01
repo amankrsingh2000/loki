@@ -2,10 +2,16 @@ package ibmcloud
 
 import (
 	"context"
+	//"crypto/tls"
+	//"crypto/x509"
 	"flag"
+	//"fmt"
+
 	"io"
 	"net"
 	"net/http"
+
+	//"os"
 	"strings"
 	"time"
 
