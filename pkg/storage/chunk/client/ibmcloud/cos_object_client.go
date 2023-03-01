@@ -45,13 +45,7 @@ const (
 	SignatureVersionV2 = "v2"
 )
 // Constants for IBM cos values
-const (
-    apiKey            = "<API_KEY>"  // eg "0viPHOY7LbLNa9eLftrtHPpTjoGv6hbLD1QalRXikliJ"
-    serviceInstanceID = "<RESOURCE_INSTANCE_ID>" // "crn:v1:bluemix:public:cloud-object-storage:global:a/<CREDENTIAL_ID_AS_GENERATED>:<SERVICE_ID_AS_GENERATED>::"
-    authEndpoint      = "https://iam.cloud.ibm.com/identity/token"
-    serviceEndpoint   = "<SERVICE_ENDPOINT>" // eg "https://s3.us.cloud-object-storage.appdomain.cloud"
-    bucketLocation    = "<LOCATION>" // eg "us"
-)
+
 
 
 var (
