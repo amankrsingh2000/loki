@@ -242,7 +242,7 @@ func (a *COSObjectClient) GetObject(ctx context.Context, objectKey string) (io.R
 		if ctx.Err() != nil {
 			return nil, 0, errors.Wrap(ctx.Err(), "ctx related error during s3 getObject")
 		}
-		err = instrument.CollectedRequest(ctx, "S3.GetObject", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
+		err = instrument.CollectedRequest(ctx, "cos.GetObject", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
 			var requestErr error
 			resp, requestErr = a.hedgedS3.GetObjectWithContext(ctx, &s3.GetObjectInput{
 				Bucket: cos.String(bucket),
@@ -264,7 +264,16 @@ func (a *COSObjectClient) GetObject(ctx context.Context, objectKey string) (io.R
 
 // PutObject into the store
 func (a *COSObjectClient) PutObject(ctx context.Context, objectKey string, object io.ReadSeeker) error {
-	return nil
+	return instrument.CollectedRequest(ctx, "cos.PutObject", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
+		putObjectInput := &s3.PutObjectInput{
+			Body:         object,
+			Bucket:       cos.String(a.bucketFromKey(objectKey)),
+			Key:          cos.String(objectKey),
+		}
+
+		_, err := a.cos.PutObjectWithContext(ctx, putObjectInput)
+		return err
+	})
 }
 
 // List implements chunk.ObjectClient.
