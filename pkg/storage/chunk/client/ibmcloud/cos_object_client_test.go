@@ -18,10 +18,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	bucket   = "test"
+	testData = map[string][]byte{
+		"key-1": []byte("test data 1"),
+		"key-2": []byte("test data 2"),
+		"key-3": []byte("test data 3"),
+	}
+	errMissingBucket = errors.New("bucket not found")
+	errMissingKey    = errors.New("key not found")
+	errMissingObject = errors.New("Object data not found")
+)
+
 type RoundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f RoundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
+}
+
+type mockCosClient struct {
+	s3iface.S3API
+	data   map[string][]byte
+	bucket string
+}
+
+func newMockCosClient() *mockCosClient {
+	return &mockCosClient{
+		data:   testData,
+		bucket: bucket,
+	}
 }
 
 func Test_COSConfig(t *testing.T) {
@@ -86,52 +111,15 @@ func Test_COSConfig(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		_, err := NewCOSObjectClient(tt.cosConfig, hedging.Config{})
-		require.Equal(t, tt.expectedError.Error(), err.Error())
+		cosClient, err := NewCOSObjectClient(tt.cosConfig, hedging.Config{})
+		if tt.expectedError != nil {
+			require.Equal(t, tt.expectedError.Error(), err.Error())
+			continue
+		}
+		require.NotNil(t, cosClient.cos)
+		require.NotNil(t, cosClient.hedgedS3)
+		require.Equal(t, []string{tt.cosConfig.BucketNames}, cosClient.bucketNames)
 	}
-}
-
-type mockCosClient struct {
-	s3iface.S3API
-	data   map[string][]byte
-	bucket string
-}
-
-var (
-	bucket   = "test"
-	testData = map[string][]byte{
-		"key-1": []byte("test data 1"),
-		"key-2": []byte("test data 2"),
-		"key-3": []byte("test data 3"),
-	}
-	errMissingBucket = errors.New("bucket not found")
-	errMissingKey    = errors.New("key not found")
-	errMissingObject = errors.New("Object data not found")
-)
-
-func newMockCosClient() *mockCosClient {
-	return &mockCosClient{
-		data:   testData,
-		bucket: bucket,
-	}
-}
-
-func (cosClient *mockCosClient) GetObjectWithContext(ctx context.Context, input *s3.GetObjectInput, opts ...request.Option) (*s3.GetObjectOutput, error) {
-	if *input.Bucket != cosClient.bucket {
-		return &s3.GetObjectOutput{}, errMissingBucket
-	}
-	data, ok := cosClient.data[*input.Key]
-	if !ok {
-		return &s3.GetObjectOutput{}, errMissingKey
-	}
-	contentLength := int64(len(data))
-	body := ioutil.NopCloser(bytes.NewReader(data))
-	output := s3.GetObjectOutput{
-		Body:          body,
-		ContentLength: &contentLength,
-	}
-
-	return &output, nil
 }
 
 func Test_GetObject(t *testing.T) {
@@ -225,6 +213,24 @@ func Test_PutObject(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, tt.Body, data)
 	}
+}
+
+func (cosClient *mockCosClient) GetObjectWithContext(ctx context.Context, input *s3.GetObjectInput, opts ...request.Option) (*s3.GetObjectOutput, error) {
+	if *input.Bucket != cosClient.bucket {
+		return &s3.GetObjectOutput{}, errMissingBucket
+	}
+	data, ok := cosClient.data[*input.Key]
+	if !ok {
+		return &s3.GetObjectOutput{}, errMissingKey
+	}
+	contentLength := int64(len(data))
+	body := ioutil.NopCloser(bytes.NewReader(data))
+	output := s3.GetObjectOutput{
+		Body:          body,
+		ContentLength: &contentLength,
+	}
+
+	return &output, nil
 }
 
 func (cosClient *mockCosClient) PutObjectWithContext(ctx context.Context, input *s3.PutObjectInput, opts ...request.Option) (*s3.PutObjectOutput, error) {
