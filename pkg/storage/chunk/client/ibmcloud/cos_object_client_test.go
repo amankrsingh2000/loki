@@ -171,6 +171,7 @@ func Test_GetObject(t *testing.T) {
 			require.Equal(t, tt.wantErr.Error(), err.Error())
 			continue
 		}
+		require.NoError(t, err)
 		data, err := ioutil.ReadAll(reader)
 		require.NoError(t, err)
 		require.Equal(t, tt.wantBytes, data)
@@ -219,6 +220,7 @@ func Test_PutObject(t *testing.T) {
 			require.Equal(t, tt.wantErr.Error(), err.Error())
 			continue
 		}
+		require.NoError(t, err)
 		data, err := ioutil.ReadAll(reader)
 		require.NoError(t, err)
 		require.Equal(t, tt.Body, data)
