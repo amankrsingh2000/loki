@@ -2,24 +2,21 @@ package ibmcloud
 
 import (
 	"context"
-	//"crypto/tls"
-	//"crypto/x509"
 	"flag"
-	//"fmt"
 	"hash/fnv"
 	"io"
 	"net"
 	"net/http"
-	//"os"
 	"strings"
 	"time"
 
-	cos "github.com/IBM/ibm-cos-sdk-go/aws"
+	ibm "github.com/IBM/ibm-cos-sdk-go/aws"
 	"github.com/IBM/ibm-cos-sdk-go/aws/awserr"
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials"
 	"github.com/IBM/ibm-cos-sdk-go/aws/session"
-	"github.com/IBM/ibm-cos-sdk-go/service/s3"
-	"github.com/IBM/ibm-cos-sdk-go/service/s3/s3iface"
+	cos "github.com/IBM/ibm-cos-sdk-go/service/s3"
+	cosiface "github.com/IBM/ibm-cos-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/grafana/dskit/backoff"
 	"github.com/grafana/dskit/flagext"
 	"github.com/pkg/errors"
@@ -33,6 +30,10 @@ import (
 var (
 	errUnsupportedSignatureVersion = errors.New("unsupported signature version")
 	errInvalidCOSHMACCredentials   = errors.New("must supply both an Access Key ID and Secret Access Key or neither")
+	errEmptyRegion                 = errors.New("region should not be empty")
+	errEmptyEndpoint               = errors.New("endpoint should not be empty")
+	errEmptyBucket                 = errors.New("at least one bucket name must be specified")
+	errCOSConfig                   = "failed to build cos config"
 )
 
 var cosRequestDuration = instrument.NewHistogramCollector(prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -60,8 +61,6 @@ type COSConfig struct {
 	SecretAccessKey flagext.Secret `yaml:"secret_access_key"`
 	HTTPConfig      HTTPConfig     `yaml:"http_config"`
 	BackoffConfig   backoff.Config `yaml:"backoff_config" doc:"description=Configures back off when cos get Object."`
-
-	Inject InjectRequestMiddleware `yaml:"-"`
 }
 
 // HTTPConfig stores the http.Transport configuration
@@ -97,8 +96,8 @@ type COSObjectClient struct {
 	cfg COSConfig
 
 	bucketNames []string
-	cos         s3iface.S3API
-	hedgedS3    s3iface.S3API
+	cos         cosiface.S3API
+	hedgedS3    cosiface.S3API
 }
 
 // NewCOSObjectClient makes a new COS backed ObjectClient.
@@ -109,43 +108,50 @@ func NewCOSObjectClient(cfg COSConfig, hedgingCfg hedging.Config) (*COSObjectCli
 	}
 	cosClient, err := buildCOSClient(cfg, hedgingCfg, false)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build cos config")
+		return nil, errors.Wrap(err, errCOSConfig)
 	}
-	s3ClientHedging, err := buildCOSClient(cfg, hedgingCfg, true)
+	cosClientHedging, err := buildCOSClient(cfg, hedgingCfg, true)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build cos config")
+		return nil, errors.Wrap(err, errCOSConfig)
 	}
-
 	client := COSObjectClient{
 		cfg:         cfg,
 		cos:         cosClient,
-		hedgedS3:    s3ClientHedging,
+		hedgedS3:    cosClientHedging,
 		bucketNames: bucketNames,
 	}
 	return &client, nil
 }
 
-func buildCOSClient(cfg COSConfig, hedgingCfg hedging.Config, hedging bool) (*s3.S3, error) {
-	var err error
+func validate(cfg COSConfig) error {
+	if cfg.AccessKeyID != "" && cfg.SecretAccessKey.String() == "" ||
+		cfg.AccessKeyID == "" && cfg.SecretAccessKey.String() != "" {
+		return errInvalidCOSHMACCredentials
+	}
 
-	cosConfig := &cos.Config{}
-	cosConfig = cosConfig.WithRegion("dummy")
+	if cfg.Region == "" {
+		return errEmptyRegion
+	}
+
+	if cfg.Endpoint == "" {
+		return errEmptyEndpoint
+	}
+	return nil
+}
+
+func buildCOSClient(cfg COSConfig, hedgingCfg hedging.Config, hedging bool) (*cos.S3, error) {
+	var err error
+	if err = validate(cfg); err != nil {
+		return nil, err
+	}
+	cosConfig := &ibm.Config{}
 
 	cosConfig = cosConfig.WithMaxRetries(0)                        // We do our own retries, so we can monitor them
 	cosConfig = cosConfig.WithS3ForcePathStyle(cfg.ForcePathStyle) // support for Path Style cos url if has the flag
 
-	if cfg.Endpoint != "" {
-		cosConfig = cosConfig.WithEndpoint(cfg.Endpoint)
-	}
+	cosConfig = cosConfig.WithEndpoint(cfg.Endpoint)
 
-	if cfg.Region != "" {
-		cosConfig = cosConfig.WithRegion(cfg.Region)
-	}
-
-	if cfg.AccessKeyID != "" && cfg.SecretAccessKey.String() == "" ||
-		cfg.AccessKeyID == "" && cfg.SecretAccessKey.String() != "" {
-		return nil, errInvalidCOSHMACCredentials
-	}
+	cosConfig = cosConfig.WithRegion(cfg.Region)
 
 	if cfg.AccessKeyID != "" && cfg.SecretAccessKey.String() != "" {
 		creds := credentials.NewStaticCredentials(cfg.AccessKeyID, cfg.SecretAccessKey.String(), "")
@@ -167,9 +173,6 @@ func buildCOSClient(cfg COSConfig, hedgingCfg hedging.Config, hedging bool) (*s3
 		ResponseHeaderTimeout: cfg.HTTPConfig.ResponseHeaderTimeout,
 	})
 
-	if cfg.Inject != nil {
-		transport = cfg.Inject(transport)
-	}
 	httpClient := &http.Client{
 		Transport: transport,
 	}
@@ -188,7 +191,7 @@ func buildCOSClient(cfg COSConfig, hedgingCfg hedging.Config, hedging bool) (*s3
 		return nil, errors.Wrap(err, "failed to create new cos session")
 	}
 
-	cosClient := s3.New(sess)
+	cosClient := cos.New(sess)
 
 	return cosClient, nil
 }
@@ -202,22 +205,22 @@ func buckets(cfg COSConfig) ([]string, error) {
 	}
 
 	if len(bucketNames) == 0 {
-		return nil, errors.New("at least one bucket name must be specified")
+		return nil, errEmptyBucket
 	}
 	return bucketNames, nil
 }
 
 // Stop fulfills the chunk.ObjectClient interface
-func (a *COSObjectClient) Stop() {}
+func (c *COSObjectClient) Stop() {}
 
-// DeleteObject deletes the specified objectKey from the appropriate S3 bucket
-func (a *COSObjectClient) DeleteObject(ctx context.Context, objectKey string) error {
+// DeleteObject deletes the specified objectKey from the appropriate cos bucket
+func (c *COSObjectClient) DeleteObject(ctx context.Context, objectKey string) error {
 	return nil
 }
 
 // bucketFromKey maps a key to a bucket name
-func (a *COSObjectClient) bucketFromKey(key string) string {
-	if len(a.bucketNames) == 0 {
+func (c *COSObjectClient) bucketFromKey(key string) string {
+	if len(c.bucketNames) == 0 {
 		return ""
 	}
 
@@ -225,28 +228,28 @@ func (a *COSObjectClient) bucketFromKey(key string) string {
 	hasher.Write([]byte(key)) //nolint: errcheck
 	hash := hasher.Sum32()
 
-	return a.bucketNames[hash%uint32(len(a.bucketNames))]
+	return c.bucketNames[hash%uint32(len(c.bucketNames))]
 }
 
 // GetObject returns a reader and the size for the specified object key from the configured COS bucket.
-func (a *COSObjectClient) GetObject(ctx context.Context, objectKey string) (io.ReadCloser, int64, error) {
+func (c *COSObjectClient) GetObject(ctx context.Context, objectKey string) (io.ReadCloser, int64, error) {
 
-	var resp *s3.GetObjectOutput
+	var resp *cos.GetObjectOutput
 
 	// Map the key into a bucket
-	bucket := a.bucketFromKey(objectKey)
+	bucket := c.bucketFromKey(objectKey)
 
-	retries := backoff.New(ctx, a.cfg.BackoffConfig)
+	retries := backoff.New(ctx, c.cfg.BackoffConfig)
 	err := ctx.Err()
 	for retries.Ongoing() {
 		if ctx.Err() != nil {
-			return nil, 0, errors.Wrap(ctx.Err(), "ctx related error during s3 getObject")
+			return nil, 0, errors.Wrap(ctx.Err(), "ctx related error during cos getObject")
 		}
 		err = instrument.CollectedRequest(ctx, "cos.GetObject", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
 			var requestErr error
-			resp, requestErr = a.hedgedS3.GetObjectWithContext(ctx, &s3.GetObjectInput{
-				Bucket: cos.String(bucket),
-				Key:    cos.String(objectKey),
+			resp, requestErr = c.hedgedS3.GetObjectWithContext(ctx, &cos.GetObjectInput{
+				Bucket: ibm.String(bucket),
+				Key:    ibm.String(objectKey),
 			})
 			return requestErr
 		})
@@ -263,26 +266,26 @@ func (a *COSObjectClient) GetObject(ctx context.Context, objectKey string) (io.R
 }
 
 // PutObject into the store
-func (a *COSObjectClient) PutObject(ctx context.Context, objectKey string, object io.ReadSeeker) error {
+func (c *COSObjectClient) PutObject(ctx context.Context, objectKey string, object io.ReadSeeker) error {
 	return instrument.CollectedRequest(ctx, "cos.PutObject", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
-		putObjectInput := &s3.PutObjectInput{
-			Body:         object,
-			Bucket:       cos.String(a.bucketFromKey(objectKey)),
-			Key:          cos.String(objectKey),
+		putObjectInput := &cos.PutObjectInput{
+			Body:   object,
+			Bucket: ibm.String(c.bucketFromKey(objectKey)),
+			Key:    ibm.String(objectKey),
 		}
 
-		_, err := a.cos.PutObjectWithContext(ctx, putObjectInput)
+		_, err := c.cos.PutObjectWithContext(ctx, putObjectInput)
 		return err
 	})
 }
 
 // List implements chunk.ObjectClient.
-func (a *COSObjectClient) List(ctx context.Context, prefix, delimiter string) ([]client.StorageObject, []client.StorageCommonPrefix, error) {
+func (c *COSObjectClient) List(ctx context.Context, prefix, delimiter string) ([]client.StorageObject, []client.StorageCommonPrefix, error) {
 	return nil, nil, nil
 }
 
 // IsObjectNotFoundErr returns true if error means that object is not found. Relevant to GetObject and DeleteObject operations.
-func (a *COSObjectClient) IsObjectNotFoundErr(err error) bool {
+func (c *COSObjectClient) IsObjectNotFoundErr(err error) bool {
 	if aerr, ok := errors.Cause(err).(awserr.Error); ok && aerr.Code() == s3.ErrCodeNoSuchKey {
 		return true
 	}
