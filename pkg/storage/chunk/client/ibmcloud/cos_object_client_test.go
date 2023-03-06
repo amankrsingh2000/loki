@@ -56,6 +56,7 @@ func newMockCosClient(data map[string][]byte) *mockCosClient {
 	}
 }
 
+<<<<<<< HEAD
 func (cosClient *mockCosClient) GetObjectWithContext(ctx context.Context, input *s3.GetObjectInput, opts ...request.Option) (*s3.GetObjectOutput, error) {
 	if *input.Bucket != cosClient.bucket {
 		return &s3.GetObjectOutput{}, errMissingBucket
@@ -98,10 +99,13 @@ func (cosClient *mockCosClient) PutObjectWithContext(ctx context.Context, input 
 	return &s3.PutObjectOutput{}, nil
 }
 
+=======
+>>>>>>> 412302f1b (Arrange methods belong to mockCosClient together)
 func (cosClient *mockCosClient) DeleteObjectWithContext(ctx context.Context, input *s3.DeleteObjectInput, opts ...request.Option) (*s3.DeleteObjectOutput, error) {
 	if *input.Bucket != cosClient.bucket {
 		return &s3.DeleteObjectOutput{}, errMissingBucket
 	}
+<<<<<<< HEAD
 
 	if _, ok := cosClient.data[*input.Key]; !ok {
 		return &s3.DeleteObjectOutput{}, errMissingObject
@@ -110,20 +114,34 @@ func (cosClient *mockCosClient) DeleteObjectWithContext(ctx context.Context, inp
 	delete(cosClient.data, *input.Key)
 
 	return &s3.DeleteObjectOutput{}, nil
+=======
+	if _, ok := cosClient.data[*input.Key]; !ok {
+		return &s3.DeleteObjectOutput{}, errMissingObject
+	}
+	delete(cosClient.data, *input.Key)
+
+	return nil, nil
+>>>>>>> 412302f1b (Arrange methods belong to mockCosClient together)
 }
 
 func (cosClient *mockCosClient) ListObjectsV2WithContext(ctx context.Context, input *s3.ListObjectsV2Input, opts ...request.Option) (*s3.ListObjectsV2Output, error) {
 	if *input.Bucket != cosClient.bucket {
 		return &s3.ListObjectsV2Output{}, errMissingBucket
 	}
+<<<<<<< HEAD
 
+=======
+>>>>>>> 412302f1b (Arrange methods belong to mockCosClient together)
 	var objects []*s3.Object
 	if *input.Prefix != "key" {
 		return &s3.ListObjectsV2Output{
 			Contents: objects,
 		}, nil
 	}
+<<<<<<< HEAD
 
+=======
+>>>>>>> 412302f1b (Arrange methods belong to mockCosClient together)
 	for object := range cosClient.data {
 		key := object
 		objects = append(objects, &s3.Object{
