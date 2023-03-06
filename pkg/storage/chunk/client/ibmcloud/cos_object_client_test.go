@@ -22,11 +22,11 @@ import (
 var (
 	bucket    = "test"
 	timestamp = time.Now().Local()
-
-	testData = map[string][]byte{
+	testData  = map[string][]byte{
 		"key-1": []byte("test data 1"),
 		"key-2": []byte("test data 2"),
 		"key-3": []byte("test data 3"),
+		"key-4": []byte("test data 4"),
 	}
 
 	testDeleteData = map[string][]byte{
