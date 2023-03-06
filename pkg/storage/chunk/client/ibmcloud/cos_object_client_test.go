@@ -74,7 +74,7 @@ func (cosClient *mockCosClient) PutObjectWithContext(ctx context.Context, input 
 	if !ok {
 		cosClient.data[*input.Key] = dataBytes
 	}
-	return nil, nil
+	return &s3.PutObjectOutput{}, nil
 }
 
 func Test_COSConfig(t *testing.T) {
