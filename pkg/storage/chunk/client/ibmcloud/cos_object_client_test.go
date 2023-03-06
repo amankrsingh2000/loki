@@ -179,15 +179,19 @@ func Test_GetObject(t *testing.T) {
 				MaxRetries: 1,
 			},
 		}
+
 		cosClient, err := NewCOSObjectClient(cosConfig, hedging.Config{})
 		require.NoError(t, err)
+
 		cosClient.hedgedS3 = newMockCosClient()
+
 		reader, _, err := cosClient.GetObject(context.Background(), tt.key)
 		if tt.wantErr != nil {
 			require.Equal(t, tt.wantErr.Error(), err.Error())
 			continue
 		}
 		require.NoError(t, err)
+
 		data, err := ioutil.ReadAll(reader)
 		require.NoError(t, err)
 		require.Equal(t, tt.wantBytes, data)
@@ -220,23 +224,30 @@ func Test_PutObject(t *testing.T) {
 				MaxRetries: 1,
 			},
 		}
+
 		cosClient, err := NewCOSObjectClient(cosConfig, hedging.Config{})
 		require.NoError(t, err)
+
 		cosClient.cos = newMockCosClient()
+
 		body := bytes.NewReader(tt.Body)
+
 		err = cosClient.PutObject(context.Background(), tt.key, body)
 		if tt.wantErr != nil {
 			require.Equal(t, tt.wantErr.Error(), err.Error())
 			continue
 		}
 		require.NoError(t, err)
+
 		cosClient.hedgedS3 = newMockCosClient()
+
 		reader, _, err := cosClient.GetObject(context.Background(), tt.key)
 		if tt.wantErr != nil {
 			require.Equal(t, tt.wantErr.Error(), err.Error())
 			continue
 		}
 		require.NoError(t, err)
+
 		data, err := ioutil.ReadAll(reader)
 		require.NoError(t, err)
 		require.Equal(t, tt.Body, data)
