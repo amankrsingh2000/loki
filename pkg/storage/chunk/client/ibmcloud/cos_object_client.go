@@ -292,7 +292,7 @@ func (a *COSObjectClient) List(ctx context.Context, prefix, delimiter string) ([
 	var commonPrefixes []client.StorageCommonPrefix
 
 	for i := range a.bucketNames {
-		err := instrument.CollectedRequest(ctx, "cos.List", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
+		err := instrument.CollectedRequest(ctx, "COS.List", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
 			input := cos.ListObjectsV2Input{
 				Bucket:    ibm.String(a.bucketNames[i]),
 				Prefix:    ibm.String(prefix),
