@@ -461,10 +461,11 @@ func Test_List(t *testing.T) {
 	}
 }
 
-func Test_IAM(t *testing.T) {
+func Test_APIKeyAuth(t *testing.T) {
 	testToken := "test"
 	tokenType := "Bearer"
 	resp := "testGet"
+
 	cosSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != fmt.Sprintf("%s %s", tokenType, testToken) {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -474,6 +475,7 @@ func Test_IAM(t *testing.T) {
 		fmt.Fprintln(w, resp)
 	}))
 	defer cosSvr.Close()
+
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := token.Token{
 			AccessToken:  testToken,
@@ -482,14 +484,17 @@ func Test_IAM(t *testing.T) {
 			ExpiresIn:    int64((time.Hour * 24).Seconds()),
 			Expiration:   time.Now().Add(time.Hour * 24).Unix(),
 		}
+
 		data, err := json.Marshal(token)
 		if err != nil {
 			w.Write([]byte("error"))
 		}
+
 		w.WriteHeader(http.StatusAccepted)
 		w.Write(data)
 	}))
 	defer authServer.Close()
+
 	cosConfig := COSConfig{
 		BucketNames:       "dummy",
 		Endpoint:          cosSvr.URL,
@@ -502,10 +507,13 @@ func Test_IAM(t *testing.T) {
 			MaxRetries: 1,
 		},
 	}
+
 	cosClient, err := NewCOSObjectClient(cosConfig, hedging.Config{})
 	require.NoError(t, err)
+
 	reader, _, err := cosClient.GetObject(context.Background(), "key-1")
 	require.NoError(t, err)
+
 	data, err := ioutil.ReadAll(reader)
 	require.NoError(t, err)
 	require.Equal(t, resp, strings.Trim(string(data), "\n"))
