@@ -42,6 +42,9 @@ S3 is AWS's hosted object store. It is a good candidate for a managed object sto
 Blob Storage is Microsoft Azure's hosted object store. It is a good candidate for a managed object store, especially when you're already running on Azure, and is production safe.
 You can authenticate Blob Storage access by using a storage account name and key or by using a Service Principal.
 
+### IBM Cloud Object Storage (COS)
+COS is IBM Cloud hosted object store. It is a good candidate for a managed object store, especially when you're already running on IBM Cloud, and is production safe.
+
 ### Notable Mentions
 
 You may use any substitutable services, such as those that implement the S3 API like [MinIO](https://min.io/).
@@ -304,6 +307,80 @@ This guide assumes a provisioned EKS cluster.
    Note, the bucket name defaults to `loki-data` but can be changed via the
    `bucket_name` variable.
 
+
+### IBM Cloud Object Storage
+
+```yaml
+schema_config:
+  configs:
+    - from: 2020-10-01
+      index:
+        period: 24h
+        prefix: loki_index_
+      object_store: "cos"
+      schema: v11
+      store: "boltdb-shipper"
+
+storage_config:
+  cos:
+    bucket: <bucket>
+    endpoint: <endpoint>
+    api_key: <api_key_to_authenticate_with_cos>
+    region: <region>
+    service_instance_id: <cos_service_instance_id>
+    auth_endpoint: <iam_endpoint_for_authentication>
+```
+
+The role should have a policy with the following permissions attached.
+
+```json
+{
+    "type": "access",
+    "roles": [
+        {
+            "role_id": "crn:v1:bluemix:public:iam::::serviceRole:Writer"
+        },
+        {
+            "role_id": "crn:v1:bluemix:public:cloud-object-storage::::serviceRole:ContentReader"
+        },
+        {
+            "role_id": "crn:v1:bluemix:public:cloud-object-storage::::serviceRole:ObjectReader"
+        },
+        {
+            "role_id": "crn:v1:bluemix:public:cloud-object-storage::::serviceRole:ObjectWriter"
+        }
+    ],
+    "resources": [
+        {
+            "attributes": [
+                {
+                    "name": "accountId",
+                    "value": "<ibm_cloud_account_id>"
+                },
+                {
+                    "name": "serviceName",
+                    "value": "cloud-object-storage"
+                },
+                {
+                    "name": "resource",
+                    "value": "<bucket_name>",
+                    "operator": "stringEquals"
+                }
+            ]
+        }
+    ],
+    "subjects": [
+        {
+            "attributes": [
+                {
+                    "name": "iam_id",
+                    "value": "<ibm_cloud_iam_id>"
+                }
+            ]
+        }
+    ]
+}
+```
 
 ### On prem deployment (Cassandra+Cassandra)
 

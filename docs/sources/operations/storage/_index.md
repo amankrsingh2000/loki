@@ -45,6 +45,7 @@ The following are supported for the chunks:
 - [Google Cloud Storage](https://cloud.google.com/storage/)
 - [Filesystem]({{<relref "filesystem">}}) (please read more about the filesystem to understand the pros/cons before using with production data)
 - [Baidu Object Storage](https://cloud.baidu.com/product/bos.html)
+- [IBM Cloud Object Storage](https://www.ibm.com/cloud/object-storage)
 
 ## Cloud Storage Permissions
 
@@ -108,6 +109,19 @@ Resources: `*`
 
 Resources: `arn:aws:iam::<aws_account_id>:role/<role_name>`
 
+
+### IBM Cloud Object Storage
+
+When using IBM Cloud Object Storage (COS) as object storage, the following permissions are needed:
+
+- `Content Reader`
+- `Object Reader`
+- `Object Writer`
+- `Writer`
+
+**Note:** `Writer` will give `Content Reader`, `Object Reader` and `Object Writer` permissions along with permission to delete.
+
+See the [IBM Cloud Object Storage section]({{<relref "../../storage/#ibm-cloud-object-storage">}}) on the storage page for a detailed setup guide.
 
 ## Chunk Format
 
