@@ -339,15 +339,6 @@ The role should have a policy with the following permissions attached.
     "roles": [
         {
             "role_id": "crn:v1:bluemix:public:iam::::serviceRole:Writer"
-        },
-        {
-            "role_id": "crn:v1:bluemix:public:cloud-object-storage::::serviceRole:ContentReader"
-        },
-        {
-            "role_id": "crn:v1:bluemix:public:cloud-object-storage::::serviceRole:ObjectReader"
-        },
-        {
-            "role_id": "crn:v1:bluemix:public:cloud-object-storage::::serviceRole:ObjectWriter"
         }
     ],
     "resources": [

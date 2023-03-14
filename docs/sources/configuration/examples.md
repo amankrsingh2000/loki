@@ -333,6 +333,7 @@ storage_config:
       kms_key_id: 0987dcba-09fe-87dc-65ba-ab0987654321
 ```
 
+
 ## 11-IBM-Cloud-Object-Storage-Config-With-HMAC.yaml
 
 ```yaml

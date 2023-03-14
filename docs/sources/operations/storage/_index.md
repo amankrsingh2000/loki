@@ -114,12 +114,7 @@ Resources: `arn:aws:iam::<aws_account_id>:role/<role_name>`
 
 When using IBM Cloud Object Storage (COS) as object storage, the following permissions are needed:
 
-- `Content Reader`
-- `Object Reader`
-- `Object Writer`
 - `Writer`
-
-**Note:** `Writer` will give `Content Reader`, `Object Reader` and `Object Writer` permissions along with permission to delete.
 
 See the [IBM Cloud Object Storage section]({{<relref "../../storage/#ibm-cloud-object-storage">}}) on the storage page for a detailed setup guide.
 
