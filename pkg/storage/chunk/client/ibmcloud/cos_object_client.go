@@ -83,24 +83,24 @@ func (cfg *COSConfig) RegisterFlags(f *flag.FlagSet) {
 
 // RegisterFlagsWithPrefix adds the flags required to config this to the given FlagSet with a specified prefix
 func (cfg *COSConfig) RegisterFlagsWithPrefix(prefix string, f *flag.FlagSet) {
-	f.BoolVar(&cfg.ForcePathStyle, prefix+"COS.force-path-style", false, "Set this to `true` to force the request to use path-style addressing.")
-	f.StringVar(&cfg.BucketNames, prefix+"COS.buckets", "", "Comma separated list of bucket names to evenly distribute chunks over.")
+	f.BoolVar(&cfg.ForcePathStyle, prefix+"cos.force-path-style", false, "Set this to `true` to force the request to use path-style addressing.")
+	f.StringVar(&cfg.BucketNames, prefix+"cos.buckets", "", "Comma separated list of bucket names to evenly distribute chunks over.")
 
-	f.StringVar(&cfg.Endpoint, prefix+"COS.endpoint", "", "COS Endpoint to connect to.")
-	f.StringVar(&cfg.Region, prefix+"COS.region", "", "COS region to use.")
-	f.StringVar(&cfg.AccessKeyID, prefix+"COS.access-key-id", "", "COS HMAC Access Key ID")
-	f.Var(&cfg.SecretAccessKey, prefix+"COS.secret-access-key", "COS HMAC Secret Access Key")
+	f.StringVar(&cfg.Endpoint, prefix+"cos.endpoint", "", "COS Endpoint to connect to.")
+	f.StringVar(&cfg.Region, prefix+"cos.region", "", "COS region to use.")
+	f.StringVar(&cfg.AccessKeyID, prefix+"cos.access-key-id", "", "COS HMAC Access Key ID")
+	f.Var(&cfg.SecretAccessKey, prefix+"cos.secret-access-key", "COS HMAC Secret Access Key")
 
-	f.DurationVar(&cfg.HTTPConfig.IdleConnTimeout, prefix+"COS.http.idle-conn-timeout", 90*time.Second, "The maximum amount of time an idle connection will be held open.")
-	f.DurationVar(&cfg.HTTPConfig.ResponseHeaderTimeout, prefix+"COS.http.response-header-timeout", 0, "If non-zero, specifies the amount of time to wait for a server's response headers after fully writing the request.")
+	f.DurationVar(&cfg.HTTPConfig.IdleConnTimeout, prefix+"cos.http.idle-conn-timeout", 90*time.Second, "The maximum amount of time an idle connection will be held open.")
+	f.DurationVar(&cfg.HTTPConfig.ResponseHeaderTimeout, prefix+"cos.http.response-header-timeout", 0, "If non-zero, specifies the amount of time to wait for a server's response headers after fully writing the request.")
 
-	f.DurationVar(&cfg.BackoffConfig.MinBackoff, prefix+"COS.min-backoff", 100*time.Millisecond, "Minimum backoff time when cos get Object")
-	f.DurationVar(&cfg.BackoffConfig.MaxBackoff, prefix+"COS.max-backoff", 3*time.Second, "Maximum backoff time when cos get Object")
-	f.IntVar(&cfg.BackoffConfig.MaxRetries, prefix+"COS.max-retries", 5, "Maximum number of times to retry when cos get Object")
+	f.DurationVar(&cfg.BackoffConfig.MinBackoff, prefix+"cos.min-backoff", 100*time.Millisecond, "Minimum backoff time when cos get Object")
+	f.DurationVar(&cfg.BackoffConfig.MaxBackoff, prefix+"cos.max-backoff", 3*time.Second, "Maximum backoff time when cos get Object")
+	f.IntVar(&cfg.BackoffConfig.MaxRetries, prefix+"cos.max-retries", 5, "Maximum number of times to retry when cos get Object")
 
-	f.Var(&cfg.ApiKey, prefix+"api-key", "api Key")
-	f.StringVar(&cfg.AuthEndpoint, prefix+"auth-endpoint", defaultCOSAuthEndpoint, "Auth Endpoint to connect to.")
-	f.StringVar(&cfg.ServiceInstanceID, prefix+"service-instance-id", "", "COS service instance id to use")
+	f.Var(&cfg.ApiKey, prefix+"cos.api-key", "api Key")
+	f.StringVar(&cfg.AuthEndpoint, prefix+"cos.auth-endpoint", defaultCOSAuthEndpoint, "Auth Endpoint to connect to.")
+	f.StringVar(&cfg.ServiceInstanceID, prefix+"cos.service-instance-id", "", "COS service instance id to use")
 }
 
 type COSObjectClient struct {
@@ -108,7 +108,7 @@ type COSObjectClient struct {
 
 	bucketNames []string
 	cos         cosiface.S3API
-	hedgedS3    cosiface.S3API
+	hedgedCOS   cosiface.S3API
 }
 
 // NewCOSObjectClient makes a new COS backed ObjectClient.
@@ -128,7 +128,7 @@ func NewCOSObjectClient(cfg COSConfig, hedgingCfg hedging.Config) (*COSObjectCli
 	client := COSObjectClient{
 		cfg:         cfg,
 		cos:         cosClient,
-		hedgedS3:    cosClientHedging,
+		hedgedCOS:   cosClientHedging,
 		bucketNames: bucketNames,
 	}
 	return &client, nil
@@ -286,7 +286,7 @@ func (c *COSObjectClient) GetObject(ctx context.Context, objectKey string) (io.R
 		}
 		err = instrument.CollectedRequest(ctx, "COS.GetObject", cosRequestDuration, instrument.ErrorCode, func(ctx context.Context) error {
 			var requestErr error
-			resp, requestErr = c.hedgedS3.GetObjectWithContext(ctx, &cos.GetObjectInput{
+			resp, requestErr = c.hedgedCOS.GetObjectWithContext(ctx, &cos.GetObjectInput{
 				Bucket: ibm.String(bucket),
 				Key:    ibm.String(objectKey),
 			})

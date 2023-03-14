@@ -249,7 +249,7 @@ func Test_COSConfig(t *testing.T) {
 			continue
 		}
 		require.NotNil(t, cosClient.cos)
-		require.NotNil(t, cosClient.hedgedS3)
+		require.NotNil(t, cosClient.hedgedCOS)
 		require.Equal(t, []string{tt.cosConfig.BucketNames}, cosClient.bucketNames)
 	}
 }
@@ -287,7 +287,7 @@ func Test_GetObject(t *testing.T) {
 		cosClient, err := NewCOSObjectClient(cosConfig, hedging.Config{})
 		require.NoError(t, err)
 
-		cosClient.hedgedS3 = newMockCosClient(testData)
+		cosClient.hedgedCOS = newMockCosClient(testData)
 
 		reader, _, err := cosClient.GetObject(context.Background(), tt.key)
 		if tt.wantErr != nil {
@@ -343,7 +343,7 @@ func Test_PutObject(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		cosClient.hedgedS3 = newMockCosClient(testData)
+		cosClient.hedgedCOS = newMockCosClient(testData)
 
 		reader, _, err := cosClient.GetObject(context.Background(), tt.key)
 		if tt.wantErr != nil {
@@ -390,7 +390,7 @@ func Test_DeleteObject(t *testing.T) {
 		err = cosClient.DeleteObject(context.Background(), tt.key)
 		require.NoError(t, err)
 
-		cosClient.hedgedS3 = newMockCosClient(testDeleteData)
+		cosClient.hedgedCOS = newMockCosClient(testDeleteData)
 
 		// call GetObject() for confirming the deleted object is no longer exist in bucket
 		reader, _, err := cosClient.GetObject(context.Background(), tt.key)
