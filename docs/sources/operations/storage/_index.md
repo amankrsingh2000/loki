@@ -112,9 +112,7 @@ Resources: `arn:aws:iam::<aws_account_id>:role/<role_name>`
 
 ### IBM Cloud Object Storage
 
-When using IBM Cloud Object Storage (COS) as object storage, the following permissions are needed:
-
-- `Writer`
+When using IBM Cloud Object Storage (COS) as object storage, IAM `Writer` role is needed.
 
 See the [IBM Cloud Object Storage section]({{<relref "../../storage/#ibm-cloud-object-storage">}}) on the storage page for a detailed setup guide.
 

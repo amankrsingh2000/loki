@@ -352,7 +352,7 @@ schema_config:
 
 storage_config:
   cos:
-    bucket: <bucket>
+    bucket_names: <bucket>
     endpoint: <endpoint>
     region: <region>
     access_key_id: <access_key_id>
@@ -378,7 +378,7 @@ schema_config:
 
 storage_config:
   cos:
-    bucket: <bucket>
+    bucketnames: <bucket1, bucket2>
     endpoint: <endpoint>
     region: <region>
     api_key: <api_key_to_authenticate_with_cos>

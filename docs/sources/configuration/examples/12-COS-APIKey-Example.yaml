@@ -12,7 +12,7 @@ schema_config:
 
 storage_config:
   cos:
-    bucket: <bucket>
+    bucketnames: <bucket1, bucket2>
     endpoint: <endpoint>
     api_key: <api_key_to_authenticate_with_cos>
     region: <region>
