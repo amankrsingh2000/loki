@@ -25,6 +25,7 @@ import (
 	"github.com/grafana/loki/pkg/storage/chunk/client/baidubce"
 	"github.com/grafana/loki/pkg/storage/chunk/client/gcp"
 	"github.com/grafana/loki/pkg/storage/chunk/client/hedging"
+	"github.com/grafana/loki/pkg/storage/chunk/client/ibmcloud"
 	"github.com/grafana/loki/pkg/storage/chunk/client/openstack"
 )
 
@@ -40,6 +41,7 @@ type RuleStoreConfig struct {
 	S3           aws.S3Config              `yaml:"s3" doc:"description=Configures backend rule storage for S3."`
 	BOS          baidubce.BOSStorageConfig `yaml:"bos" doc:"description=Configures backend rule storage for Baidu Object Storage (BOS)."`
 	Swift        openstack.SwiftConfig     `yaml:"swift" doc:"description=Configures backend rule storage for Swift."`
+	COS          ibmcloud.COSConfig        `yaml:"cos" doc:"description=Configures backend rule storage for IBM Cloud Object Storage (COS)."`
 	Local        local.Config              `yaml:"local" doc:"description=Configures backend rule storage for a local file system directory."`
 
 	mock rulestore.RuleStore `yaml:"-"`
@@ -54,6 +56,7 @@ func (cfg *RuleStoreConfig) RegisterFlags(f *flag.FlagSet) {
 	cfg.Swift.RegisterFlagsWithPrefix("ruler.storage.", f)
 	cfg.Local.RegisterFlagsWithPrefix("ruler.storage.", f)
 	cfg.BOS.RegisterFlagsWithPrefix("ruler.storage.", f)
+	cfg.COS.RegisterFlagsWithPrefix("ruler.storage.", f)
 	f.StringVar(&cfg.Type, "ruler.storage.type", "", "Method to use for backend rule storage (configdb, azure, gcs, s3, swift, local, bos)")
 }
 
@@ -68,6 +71,11 @@ func (cfg *RuleStoreConfig) Validate() error {
 	if err := cfg.S3.Validate(); err != nil {
 		return errors.Wrap(err, "invalid S3 Storage config")
 	}
+	/* currently cos does not support storage class so we don't add validation
+	if err := cfg.COS.Validate(); err != nil {
+		return errors.Wrap(err, "invalid COS Storage config")
+	}
+	*/
 	return nil
 }
 
@@ -102,6 +110,8 @@ func NewLegacyRuleStore(cfg RuleStoreConfig, hedgeCfg hedging.Config, clientMetr
 		client, err = baidubce.NewBOSObjectStorage(&cfg.BOS)
 	case "swift":
 		client, err = openstack.NewSwiftObjectClient(cfg.Swift, hedgeCfg)
+	case "cos":
+		client, err = ibmcloud.NewCOSObjectClient(cfg.COS, hedgeCfg)
 	case "local":
 		return local.NewLocalRulesClient(cfg.Local, loader)
 	default:
